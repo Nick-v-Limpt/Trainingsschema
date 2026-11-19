@@ -109,6 +109,7 @@
   .last-best { display: block; font-family: var(--font-mono); font-size: 12px; color: var(--amber); margin-top: 3px; }
 
   .section-label { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--iron); margin: 18px 0 8px; font-weight: 600; }
+  .fail-note { font-size: 12.5px; line-height: 1.5; color: var(--amber); margin: -2px 0 10px; }
   .explain { font-size: 14.5px; line-height: 1.6; margin: 0 0 4px; }
   .cue { font-size: 13.5px; line-height: 1.6; color: var(--text-dim); border-left: 2px solid var(--line); padding-left: 12px; margin-top: 12px; }
 
@@ -181,6 +182,7 @@
   .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; margin-bottom: 14px; }
   .panel-title { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--iron); font-weight: 600; margin: 0 0 10px; }
   .hint { font-size: 12.5px; color: var(--text-dim); line-height: 1.5; margin: 8px 0 0; }
+  .status-line { font-family: var(--font-mono); font-size: 12px; color: var(--steel); margin: 10px 0 0; line-height: 1.5; }
   .field-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); margin: 10px 0 4px; display: block; line-height: 1.4; }
   .field-label:first-child { margin-top: 0; }
   .settings-input, .settings-textarea, .settings-select { width: 100%; background: var(--surface-input); border: 1px solid var(--line); border-radius: var(--radius); color: var(--text); padding: 9px 10px; font-size: 16px; }
@@ -198,8 +200,8 @@
   .add-btn.danger { border-color: var(--iron-dim); color: var(--iron); margin-top: 10px; }
 
   /* ---- instellingen ---- */
-  .seg { display: grid; grid-template-columns: repeat(3, 1fr); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 3px; margin-bottom: 16px; }
-  .seg button { background: none; border: none; color: var(--text-dim); font-size: 13px; font-weight: 600; padding: 10px 4px; border-radius: 6px; cursor: pointer; }
+  .seg { display: grid; grid-template-columns: repeat(4, 1fr); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 3px; margin-bottom: 16px; }
+  .seg button { background: none; border: none; color: var(--text-dim); font-size: 12.5px; font-weight: 600; padding: 10px 2px; border-radius: 6px; cursor: pointer; }
   .seg button.active { background: var(--surface-raised); color: var(--text); box-shadow: inset 0 0 0 1px var(--line); }
 
   details.sub { margin-top: 12px; border-top: 1px dashed var(--line); padding-top: 4px; }
@@ -224,7 +226,7 @@
   .ex-row-body > .field-label:first-child { margin-top: 12px; }
 
   .alt-card { background: var(--surface-input); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; margin-bottom: 8px; }
-  .alt-card .settings-input, .alt-card .settings-textarea { background: var(--bg); margin-top: 6px; }
+  .alt-card .settings-input, .alt-card .settings-textarea, .alt-card .settings-select { background: var(--bg); margin-top: 6px; }
   .alt-card > .settings-input:first-child { margin-top: 0; }
   .alt-card .grid-2 .settings-input { margin-top: 6px; }
   .add-ex-btn { background: var(--iron-dim); border: 1px solid var(--iron); color: var(--text); padding: 13px; border-radius: var(--radius); cursor: pointer; font-size: 13.5px; width: 100%; font-weight: 600; margin-top: 8px; }
@@ -291,7 +293,7 @@
     <p class="day-focus" id="dayFocus"></p>
     <div class="bar-progress" id="barProgress"></div>
     <div class="card" id="card"></div>
-    <p class="legend">🔥 laatste set tot falen · 📊 geschiedenis · ⚙ instellingen · v11</p>
+    <p class="legend">🔥 elke set tot falen · 📊 geschiedenis · ⚙ instellingen · v12</p>
   </div>
 
   <div id="settingsArea" style="display:none;"></div>
@@ -320,12 +322,24 @@ const $ = id => document.getElementById(id);
 const clone = o => JSON.parse(JSON.stringify(o));
 let idCounter = 0;
 function genId() { idCounter++; return "c" + Date.now().toString(36) + idCounter.toString(36) + Math.floor(Math.random() * 1296).toString(36); }
+function randomId(n) {
+  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+  let out = "";
+  try {
+    const arr = new Uint32Array(n); crypto.getRandomValues(arr);
+    for (let i = 0; i < n; i++) out += chars[arr[i] % chars.length];
+  } catch (e) {
+    for (let i = 0; i < n; i++) out += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return out;
+}
 function escapeHtml(str) {
   return String(str == null ? "" : str).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
 }
 function pad2(n) { return String(n).padStart(2, "0"); }
 function dateStr(d) { return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate()); }
-function todayStr() { return dateStr(new Date()); }
+/* Een werkdag loopt van 03:00 tot 03:00. Om 03:00 gaat de lopende workout automatisch naar de geschiedenis. */
+function todayStr() { return dateStr(new Date(Date.now() - 3 * 3600 * 1000)); }
 function parseDate(s) { const p = String(s).split("-").map(Number); return new Date(p[0], (p[1] || 1) - 1, p[2] || 1, 12); }
 function daysBetween(a, b) { return Math.round((parseDate(b) - parseDate(a)) / 864e5); }
 function fmtDate(s) { try { return parseDate(s).toLocaleDateString("nl-NL", { weekday: "short", day: "numeric", month: "short" }); } catch (e) { return s; } }
@@ -336,6 +350,7 @@ function fmtKg(n) { return String(Math.round(n * 100) / 100).replace(".", ","); 
 function fmtSet(s) { if (s.kg && s.reps) return s.kg + "×" + s.reps; if (s.reps) return s.reps + " reps"; if (s.kg) return s.kg + " kg"; return "✓"; }
 function fmtClock(sec) { return Math.floor(sec / 60) + ":" + pad2(sec % 60); }
 function weekKey(s) { const d = parseDate(s); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return dateStr(d); }
+function isHM(s) { return /^\d\d:\d\d$/.test(String(s || "")); }
 
 let toastHandle = null;
 function toast(msg) {
@@ -366,28 +381,29 @@ function iconSvg(pattern) {
 
 /* Verhoog SCHEMA_REV elke keer dat DEFAULT_DATA verandert: dan laadt de app het nieuwe schema
    in plaats van het schema dat nog in de browser is opgeslagen. Logs en geschiedenis blijven bewaard. */
-const SCHEMA_REV = 3;
+const SCHEMA_REV = 4;
 
+/* Alle oefeningen: 3 sets, elke set tot spierfalen. De reps zijn een richtlijn. */
 const DEFAULT_DATA = [
-  /* ---------------- DAG 1: Back & Arms ---------------- */
-  { key: "d1", name: "Back & Arms", focus: "Pull, 1e keer deze week — pull-ups + 2 bicep-oefeningen", exercises: [
-    { id:"d1e1", name:"Pull-up", muscle:"Back — Latissimus dorsi", pattern:"pull", sets:4, repsLabel:"6-10", fail:false, rest:100,
-      explain:"Hangend aan een stang trek je jezelf op tot je kin boven de stang komt, zonder ondersteuning. Traint je lats, de brede rugspier die je rug een V-vorm geeft. Op dag 4 komt de assisted variant terug.",
+  /* ---------------- DAG 1: Back & Arms + abs ---------------- */
+  { key: "d1", name: "Back & Arms", focus: "Pull, 1e keer deze week: pull-ups, biceps, triceps + abs. Elke set tot falen.", exercises: [
+    { id:"d1e1", name:"Pull-up", muscle:"Back — Latissimus dorsi", pattern:"pull", sets:3, repsLabel:"6-10", fail:true, rest:100,
+      explain:"Hangend aan een stang trek je jezelf op tot je kin boven de stang komt, zonder ondersteuning. Traint je lats, de brede rugspier die je rug een V-vorm geeft. Op dag 4 komt de pull-up terug.",
       cue:"Volledig uithangen onderaan, trek je ellebogen naar je heupen, geen zwaai.",
       alternates:[{name:"Lat Pulldown", repsLabel:"8-10", explain:"Zelfde trekbeweging maar zittend aan de kabel, voor als de pull-up stang bezet is of je de herhalingen niet meer haalt.", cue:"Trek met je ellebogen naar beneden, niet met je handen."}] },
-    { id:"d1e2", name:"Seated Cable Row", muscle:"Back — Rhomboids & Trapezius", pattern:"pull", sets:3, repsLabel:"10-12", fail:false, rest:100,
+    { id:"d1e2", name:"Seated Cable Row", muscle:"Back — Rhomboids & Trapezius", pattern:"pull", sets:3, repsLabel:"10-12", fail:true, rest:100,
       explain:"Zittend trek je een handvat horizontaal naar je buik. Traint de spieren tussen je schouderbladen.",
       cue:"Schouderbladen samentrekken op het eind, romp stil houden.",
       alternates:[{name:"Chest-Supported Row", explain:"Zelfde trekbeweging maar met je borst ondersteund, zodat je geen momentum uit je onderrug kunt gebruiken.", cue:"Ellebogen naar achteren trekken, schouderbladen samenknijpen."}] },
-    { id:"d1e3", name:"Single-Arm Dumbbell Row", muscle:"Back — Lats & Rhomboids", pattern:"pull", sets:3, repsLabel:"10-12 p/arm", fail:false, rest:100,
+    { id:"d1e3", name:"Single-Arm Dumbbell Row", muscle:"Back — Lats & Rhomboids", pattern:"pull", sets:3, repsLabel:"10-12 p/arm", fail:true, rest:100,
       explain:"Met knie en hand op een bank steunend trek je een dumbbell met de andere arm omhoog naar je heup. Handig om links-rechts verschillen weg te werken.",
       cue:"Elleboog langs je lichaam omhoog trekken, romp blijft vlak.",
       alternates:[{name:"T-Bar Row", repsLabel:"10-12", explain:"Een zwaardere, tweehandige variant met een stang tussen je benen, meer totale belasting per set.", cue:"Rug plat, trek de stang naar je onderbuik."}] },
-    { id:"d1e4", name:"Straight-Arm Pulldown", muscle:"Back — Lats, finisher", pattern:"pull", sets:2, repsLabel:"12-15", fail:true, rest:100,
+    { id:"d1e4", name:"Straight-Arm Pulldown", muscle:"Back — Lats, finisher", pattern:"pull", sets:3, repsLabel:"12-15", fail:true, rest:100,
       explain:"Met gestrekte armen duw je een kabelstang van boven naar beneden. Isoleert puur je lats zonder hulp van je armen.",
       cue:"Armen blijven vrijwel gestrekt, beweging komt uit je schouders.",
       alternates:[{name:"Cable Pullover", explain:"Vergelijkbare rekbeweging maar dan liggend of staand met de kabel over je hoofd, iets langere rek op de lat.", cue:"Ellebogen licht gebogen, boog van boven je hoofd naar je heupen."}] },
-    { id:"d1e5", name:"Barbell Curl", muscle:"Biceps brachii", pattern:"curl", sets:3, repsLabel:"8-10", fail:false, rest:100,
+    { id:"d1e5", name:"Barbell Curl", muscle:"Biceps brachii", pattern:"curl", sets:3, repsLabel:"8-10", fail:true, rest:100,
       explain:"Staand curl je een stang vanaf gestrekte armen omhoog naar je schouders. De basisoefening voor bicepskracht.",
       cue:"Ellebogen dicht tegen je lichaam, geen zwaai met je heupen.",
       alternates:[{name:"EZ-Bar Curl", explain:"Zelfde beweging met een gebogen stang, vriendelijker voor je polsen.", cue:"Zelfde uitvoering als de barbell curl."}] },
@@ -395,19 +411,27 @@ const DEFAULT_DATA = [
       explain:"Op een schuine bank hangen je armen recht naar beneden vanuit je schouders. Doordat je biceps hier al uitgerekt start, spreekt deze curl vooral de lange kop van je biceps extra aan.",
       cue:"Ellebogen blijven naast je lichaam, niet naar voren bewegen tijdens het curlen.",
       alternates:[{name:"Cable Curl", explain:"Zelfde curl-beweging maar aan een kabelmachine, met constante spanning door de hele beweging.", cue:"Ellebogen dicht bij je lichaam, rustig omhoog en omlaag bewegen."}] },
-    { id:"d1e7", name:"Tricep Rope Pushdown", muscle:"Triceps brachii", pattern:"extension", sets:3, repsLabel:"10-12", fail:false, rest:100,
+    { id:"d1e7", name:"Tricep Rope Pushdown", muscle:"Triceps brachii", pattern:"extension", sets:3, repsLabel:"10-12", fail:true, rest:100,
       explain:"Bij de kabelmachine duw je een touw-handvat vanaf borsthoogte naar beneden en spreid je de uiteinden onderaan.",
       cue:"Ellebogen blijven op dezelfde plek, alleen je onderarm beweegt.",
-      alternates:[{name:"V-Bar Pushdown", explain:"Zelfde beweging met een vaste V-vormige stang in plaats van een touw.", cue:"Ellebogen naast je lichaam, stang volledig naar beneden duwen."}] }
+      alternates:[{name:"V-Bar Pushdown", explain:"Zelfde beweging met een vaste V-vormige stang in plaats van een touw.", cue:"Ellebogen naast je lichaam, stang volledig naar beneden duwen."}] },
+    { id:"d1e8", name:"Cable Crunch", muscle:"Abs — Rectus abdominis", pattern:"curl", sets:3, repsLabel:"10-15", fail:true, rest:100,
+      explain:"Knielend onder een kabelmachine met een touw bij je hoofd rol je je romp op richting je heupen. Je kunt het gewicht net als bij elke andere oefening opbouwen, daarom is dit de beste progressieve buikoefening.",
+      cue:"Rond je rug en trek je ribben naar je bekken, heupen blijven stil, niet met je armen trekken.",
+      alternates:[{name:"Machine Crunch", explain:"Zelfde beweging in een buikmachine, als de kabelmachine bezet is.", cue:"Rustig oprollen, onderaan even knijpen."}] },
+    { id:"d1e9", name:"Hanging Leg Raise", muscle:"Abs — onderbuik & heupbuigers", pattern:"raise", sets:3, repsLabel:"10-15", fail:true, rest:100,
+      explain:"Hangend aan de pull-up stang til je je benen (gebogen of gestrekt) op tot heuphoogte of hoger. Traint vooral het onderste deel van je buik.",
+      cue:"Geen zwaai, kantel je bekken omhoog zodat je buik werkt en niet alleen je heupbuigers.",
+      alternates:[{name:"Captain's Chair Leg Raise", explain:"Zelfde beweging met je armen op steunen, handig als je grip na de rug- en bicepsoefeningen op is.", cue:"Rug tegen de leuning, knieën oprollen richting je borst."}] }
   ]},
 
-  /* ---------------- DAG 2: Chest & Shoulders ---------------- */
-  { key: "d2", name: "Chest & Shoulders", focus: "Push, 1e keer deze week — 2x smith machine + push-ups", exercises: [
-    { id:"d2e1", name:"Smith Machine Bench Press", muscle:"Chest — Pectoralis major", pattern:"press", sets:4, repsLabel:"6-8", fail:true, rest:100,
+  /* ---------------- DAG 2: Chest & Shoulders + 1 bicep + 1 tricep ---------------- */
+  { key: "d2", name: "Chest & Shoulders", focus: "Push, 1e keer deze week: 2x smith machine, push-ups + 1 bicep en 1 tricep. Elke set tot falen.", exercises: [
+    { id:"d2e1", name:"Smith Machine Bench Press", muscle:"Chest — Pectoralis major", pattern:"press", sets:3, repsLabel:"6-8", fail:true, rest:100,
       explain:"Zelfde drukbeweging als een gewone bench press, maar de stang loopt vast in een geleide baan. Handiger in een drukke gym omdat je geen vrije bank met stang hoeft te vinden of op een spotter hoeft te wachten.",
       cue:"Schouderbladen naar elkaar getrokken, stang gecontroleerd laten zakken tot net boven je borst.",
       alternates:[{name:"Barbell Bench Press", explain:"De vrije-gewicht versie op een platte bank. Traint dezelfde borstspier, maar vraagt meer stabilisatie en vaak een spotter of rek.", cue:"Grip iets breder dan schouderbreedte, stang naar je borst laten zakken."}] },
-    { id:"d2e2", name:"Incline Smith Machine Press", muscle:"Chest — bovenste borstspier", pattern:"press", sets:3, repsLabel:"8-10", fail:false, rest:100,
+    { id:"d2e2", name:"Incline Smith Machine Press", muscle:"Chest — bovenste borstspier", pattern:"press", sets:3, repsLabel:"8-10", fail:true, rest:100,
       explain:"Zet de bank schuin (30-45°) onder de smith machine. Zelfde drukbeweging als de vorige oefening, maar de nadruk verschuift naar het bovenste deel van je borst. Je kunt bij hetzelfde apparaat blijven.",
       cue:"Stang gecontroleerd naar je bovenborst laten zakken, schouderbladen naar elkaar.",
       alternates:[{name:"Incline Dumbbell Press", explain:"Zelfde hoek met dumbbells, als de smith machine bezet is. Vraagt iets meer stabilisatie.", cue:"Lichte boog, bovenaan de dumbbells niet tegen elkaar laten klappen."}] },
@@ -415,11 +439,11 @@ const DEFAULT_DATA = [
       explain:"Je staat tussen twee kabelmachines en trekt de handvatten in een boog voor je lichaam samen. Isoleert je borst zonder hulp van je triceps.",
       cue:"Lichte buiging in de ellebogen, beweging komt uit je borst.",
       alternates:[{name:"Pec Deck Fly", explain:"Zelfde effect maar in een vaste machine, makkelijker om op de spanning te focussen.", cue:"Armsteunen voor je lichaam samenbrengen, schouders laag houden."}] },
-    { id:"d2e4", name:"Push-up", muscle:"Chest — finisher", pattern:"press", sets:2, repsLabel:"max reps", fail:true, rest:100,
+    { id:"d2e4", name:"Push-up", muscle:"Chest — finisher", pattern:"press", sets:3, repsLabel:"max reps", fail:true, rest:100,
       explain:"Gewone push-up op lichaamsgewicht als afsluiter van je borst. Ga door tot je geen nette herhaling meer haalt. Op dag 4 komen de push-ups terug.",
       cue:"Lichaam in één lijn van hoofd tot hak, borst tot vlak boven de grond.",
       alternates:[{name:"Weighted Push-up", repsLabel:"max reps", explain:"Zelfde oefening met een schijf op je bovenrug, voor als je op lichaamsgewicht te veel herhalingen haalt.", cue:"Schijf laten plaatsen tussen je schouderbladen, zelfde uitvoering."},{name:"Incline Push-up", repsLabel:"max reps", explain:"Handen op een bank of stang, waardoor de oefening lichter wordt. Handig als je borst al leeg is.", cue:"Lichaam in één lijn, borst naar de bank brengen."}] },
-    { id:"d2e5", name:"Seated Dumbbell Shoulder Press", muscle:"Shoulders — voorste deltaspier", pattern:"press", sets:3, repsLabel:"8-10", fail:false, rest:100,
+    { id:"d2e5", name:"Seated Dumbbell Shoulder Press", muscle:"Shoulders — voorste deltaspier", pattern:"press", sets:3, repsLabel:"8-10", fail:true, rest:100,
       explain:"Zittend druk je twee dumbbells vanaf schouderhoogte recht omhoog. De basisoefening voor schouderkracht.",
       cue:"Rugleuning gebruiken voor steun, dumbbells niet volledig laten botsen boven je hoofd.",
       alternates:[{name:"Machine Shoulder Press", explain:"Zelfde beweging in een gefixeerde machine, iets minder stabilisatiewerk nodig.", cue:"Rug plat tegen de rugleuning, handvatten recht omhoog drukken."}] },
@@ -427,22 +451,34 @@ const DEFAULT_DATA = [
       explain:"Je trekt een kabelhandvat van je zij naar schouderhoogte, zijwaarts van je lichaam af. Isoleert de zijkant van je schouder.",
       cue:"Til met je schouder, niet met je pols.",
       alternates:[{name:"Dumbbell Lateral Raise", explain:"Zelfde beweging met dumbbells in plaats van kabel, weerstand voelt anders verdeeld.", cue:"Lichte buiging in de ellebogen, til tot schouderhoogte."}] },
-    { id:"d2e7", name:"Cable Front Raise", muscle:"Shoulders — voorste deltaspier", pattern:"raise", sets:2, repsLabel:"12-15", fail:false, rest:100,
+    { id:"d2e7", name:"Cable Front Raise", muscle:"Shoulders — voorste deltaspier", pattern:"raise", sets:3, repsLabel:"12-15", fail:true, rest:100,
       explain:"Je trekt een kabelhandvat vanaf voor je lichaam recht omhoog tot schouderhoogte. Isoleert het voorste deel van je schouder.",
       cue:"Geen zwaai vanuit je onderrug, beweging puur uit je schouder.",
-      alternates:[{name:"Dumbbell Front Raise", explain:"Zelfde beweging met een dumbbell, iets meer stabilisatie nodig dan met de kabel.", cue:"Arm bijna gestrekt omhoog brengen tot schouderhoogte."}] }
+      alternates:[{name:"Dumbbell Front Raise", explain:"Zelfde beweging met een dumbbell, iets meer stabilisatie nodig dan met de kabel.", cue:"Arm bijna gestrekt omhoog brengen tot schouderhoogte."}] },
+    { id:"d2e8", name:"Cable Curl", muscle:"Biceps brachii", pattern:"curl", sets:3, repsLabel:"10-12", fail:true, rest:100,
+      explain:"Aan een lage kabel met een rechte stang of EZ-stang curl je het gewicht omhoog naar je schouders. Je biceps houdt de hele beweging spanning, ook bovenin.",
+      cue:"Ellebogen dicht tegen je lichaam, geen zwaai met je romp.",
+      alternates:[{name:"Dumbbell Curl", explain:"Zelfde beweging met dumbbells, eventueel om en om.", cue:"Ellebogen vast naast je lichaam, rustig laten zakken."}] },
+    { id:"d2e9", name:"EZ-Bar Skull Crusher", muscle:"Triceps brachii — lange kop", pattern:"extension", sets:3, repsLabel:"10-12", fail:true, rest:100,
+      explain:"Liggend op een bank laat je een EZ-stang gecontroleerd naar je voorhoofd zakken en strek je je armen weer. Zware triceps-isolatie met veel rek.",
+      cue:"Bovenarmen blijven loodrecht, alleen je ellebogen scharnieren.",
+      alternates:[{name:"Dumbbell Skull Crusher", explain:"Zelfde beweging met twee dumbbells, vriendelijker voor je polsen.", cue:"Dumbbells naast je hoofd laten zakken, ellebogen naar voren."}] }
   ]},
 
-  /* ---------------- DAG 3: Legs & Arms (8 oefeningen) ---------------- */
-  { key: "d3", name: "Legs & Arms", focus: "Enige beendag — 2 bicep-oefeningen + triceps, 2e keer deze week", exercises: [
-    { id:"d3e1", name:"Hack Squat", muscle:"Legs — Quadriceps & Glutes", pattern:"squat", sets:4, repsLabel:"6-8", fail:true, rest:100,
+  /* ---------------- DAG 3: Legs & Arms + abs ---------------- */
+  { key: "d3", name: "Legs & Arms", focus: "Enige beendag: benen, 2 bicep-oefeningen + triceps (2e keer) + abs. Elke set tot falen.", exercises: [
+    { id:"d3e1", name:"Hack Squat", muscle:"Legs — Quadriceps & Glutes", pattern:"squat", sets:3, repsLabel:"6-8", fail:true, rest:100,
       explain:"Zelfde bewegingspatroon als een squat, maar in een machine met een vaste, schuine baan. Geen vrij rek nodig en minder balans vereist, handig als de squat rack bezet is.",
       cue:"Rug plat tegen de rugleuning, door de knieën zakken tot een hoek van ongeveer 90 graden.",
       alternates:[{name:"Barbell Back Squat", explain:"De vrije-gewicht versie met een stang op je bovenrug. Traint dezelfde spieren maar vraagt een squat rack en meer balans.", cue:"Knieën in lijn met je tenen, borst omhoog, neutrale rug."}] },
-    { id:"d3e2", name:"Leg Press", muscle:"Legs — Quadriceps & Glutes", pattern:"squat", sets:3, repsLabel:"10-12", fail:false, rest:100,
+    { id:"d3e2", name:"Leg Press", muscle:"Legs — Quadriceps & Glutes", pattern:"squat", sets:3, repsLabel:"10-12", fail:true, rest:100,
       explain:"Zittend in een schuine machine duw je een platform met je voeten weg. Ondersteunt je rug, dus je kunt vaak zwaarder trainen.",
       cue:"Knieën niet volledig doorstrekken bovenaan.",
       alternates:[{name:"Goblet Squat", explain:"Een squat met een dumbbell of kettlebell tegen je borst, goed als alternatief zonder machine.", cue:"Gewicht dicht bij je borst houden, rechtop blijven zitten in de squat."}] },
+    { id:"d3e9", name:"Leg Extension", muscle:"Legs — Quadriceps", pattern:"extension", sets:3, repsLabel:"12-15", fail:true, rest:100,
+      explain:"Zittend in de machine strek je je onderbenen omhoog tegen weerstand in. Isoleert je quadriceps zonder dat je rug of balans meespeelt, ideaal om ze na de leg press helemaal leeg te maken.",
+      cue:"Bovenaan een seconde knijpen, gecontroleerd laten zakken, heupen blijven op de zitting.",
+      alternates:[{name:"Single-Leg Extension", repsLabel:"12-15 p/been", explain:"Zelfde beweging met één been tegelijk, om links-rechts verschillen weg te werken.", cue:"Zelfde uitvoering, rustig tempo."}] },
     { id:"d3e3", name:"Lying Leg Curl", muscle:"Legs — Hamstrings", pattern:"curl", sets:3, repsLabel:"10-12", fail:true, rest:100,
       explain:"Liggend buig je je onderbenen omhoog richting je billen tegen weerstand in. Isoleert je hamstrings.",
       cue:"Heupen op de bank houden, niet omhoog duwen.",
@@ -459,19 +495,27 @@ const DEFAULT_DATA = [
       explain:"Zelfde als een curl, maar je houdt de dumbbell verticaal vast (duim naar boven), wat ook je onderarm aanspreekt.",
       cue:"Ellebogen dicht bij je lichaam, pols blijft strak.",
       alternates:[{name:"Cable Hammer Curl", explain:"Zelfde grip maar met een touw aan de kabelmachine, constante spanning door de hele beweging.", cue:"Zelfde uitvoering, ellebogen niet naar voren laten komen."}] },
-    { id:"d3e7", name:"Concentration Curl", muscle:"Biceps brachii — piek contractie", pattern:"curl", sets:2, repsLabel:"10-12", fail:true, rest:100,
+    { id:"d3e7", name:"Concentration Curl", muscle:"Biceps brachii — piek contractie", pattern:"curl", sets:3, repsLabel:"10-12", fail:true, rest:100,
       explain:"Zittend, met je elleboog tegen de binnenkant van je bovenbeen, curl je een dumbbell omhoog. Isoleert je biceps sterk doordat je geen momentum uit je schouder of rug kunt gebruiken.",
       cue:"Elleboog blijft tegen je been gedrukt, alleen je onderarm beweegt.",
       alternates:[{name:"Preacher Curl", explain:"Met je arm op een schuine steun curl je een stang of dumbbell omhoog. Zelfde isolatie-effect, maar dan tweehandig of met een vaste steun.", cue:"Bovenarm blijft op de steun liggen, volledig strekken onderaan."}] },
     { id:"d3e8", name:"Overhead Cable Tricep Extension", muscle:"Triceps — lange kop, 2e keer", pattern:"extension", sets:3, repsLabel:"10-12", fail:true, rest:100,
       explain:"Met je rug naar de kabelmachine strek je een touw-handvat van achter je hoofd naar boven. Richt zich op de lange kop van je triceps, die bij de rope pushdown van dag 1 minder aan bod komt.",
       cue:"Ellebogen wijzen naar voren en blijven naast je hoofd.",
-      alternates:[{name:"Dumbbell Overhead Extension", explain:"Zelfde beweging met één of twee dumbbells in plaats van kabel.", cue:"Ellebogen dicht bij je hoofd, gewicht achter je nek laten zakken."}] }
+      alternates:[{name:"Dumbbell Overhead Extension", explain:"Zelfde beweging met één of twee dumbbells in plaats van kabel.", cue:"Ellebogen dicht bij je hoofd, gewicht achter je nek laten zakken."}] },
+    { id:"d3e10", name:"Ab Wheel Rollout", muscle:"Abs — core, anti-extensie", pattern:"extension", sets:3, repsLabel:"8-12", fail:true, rest:100,
+      explain:"Vanuit je knieën rol je een ab wheel naar voren zo ver als je onder controle houdt en trek je jezelf weer terug. Een van de zwaarste en meest effectieve buikoefeningen, omdat je hele core onder spanning staat.",
+      cue:"Rug rond houden, bekken ingekanteld, niet in een holle rug zakken.",
+      alternates:[{name:"Stability Ball Rollout", explain:"Zelfde idee met je onderarmen op een grote bal, iets milder en makkelijker te doseren.", cue:"Rol rustig naar voren, romp als een plank."}] },
+    { id:"d3e11", name:"Cable Woodchop", muscle:"Abs — Obliques", pattern:"raise", sets:3, repsLabel:"12-15 p/kant", fail:true, rest:100,
+      explain:"Aan een kabel hoog trek je het handvat schuin naar beneden over je lichaam heen, met een draai vanuit je romp. Traint je schuine buikspieren, die de eerdere buikoefeningen niet raken.",
+      cue:"Draai vanuit je romp, niet met je armen, heupen blijven grotendeels stil.",
+      alternates:[{name:"Weighted Russian Twist", repsLabel:"12-15 p/kant", explain:"Zittend met een gewicht draai je van links naar rechts. Zelfde spiergroep zonder kabel.", cue:"Borst omhoog, draai vanuit je romp, voeten licht van de grond of aan de grond."}] }
   ]},
 
-  /* ---------------- DAG 4: Chest, Back & Shoulders ---------------- */
-  { key: "d4", name: "Chest, Back & Shoulders", focus: "2e keer deze week, lichter volume — assisted pull-ups + push-ups", exercises: [
-    { id:"d4e1", name:"Incline Machine Chest Press", muscle:"Chest — bovenste borst, 2e keer", pattern:"press", sets:3, repsLabel:"8-10", fail:false, rest:100,
+  /* ---------------- DAG 4: Chest, Back & Shoulders + 1 bicep + 1 tricep ---------------- */
+  { key: "d4", name: "Chest, Back & Shoulders", focus: "2e keer deze week: pull-ups + push-ups + 1 bicep en 1 tricep. Elke set tot falen.", exercises: [
+    { id:"d4e1", name:"Incline Machine Chest Press", muscle:"Chest — bovenste borst, 2e keer", pattern:"press", sets:3, repsLabel:"8-10", fail:true, rest:100,
       explain:"Zelfde patroon als de incline smith press van dag 2, maar in een gefixeerde machine.",
       cue:"Rug en hoofd tegen de rugleuning, handvatten naar voren drukken.",
       alternates:[{name:"Incline Dumbbell Press", explain:"Zelfde hoek met vrije dumbbells, iets meer stabilisatiewerk.", cue:"Lichte boog, bovenaan niet laten klappen."}] },
@@ -479,15 +523,15 @@ const DEFAULT_DATA = [
       explain:"Zittend breng je twee armsteunen voor je lichaam samen in een boogbeweging.",
       cue:"Lichte buiging in de ellebogen, beweging blijft in je borst.",
       alternates:[{name:"Cable Fly", explain:"Zelfde beweging maar met vrije kabels in plaats van een vaste machine.", cue:"Handvatten in een boog voor je lichaam samenbrengen."}] },
-    { id:"d4e3", name:"Assisted Pull-up", muscle:"Back — Lats, 2e keer", pattern:"pull", sets:3, repsLabel:"8-10", fail:false, rest:100,
-      explain:"Een pull-up met ondersteuning via een tegengewicht. Tweede pull-up moment van de week, na de gewone pull-ups van dag 1. Door de ondersteuning haal je meer nette herhalingen.",
+    { id:"d4e3p", name:"Pull-up", muscle:"Back — Lats, 2e keer", pattern:"pull", sets:3, repsLabel:"6-10", fail:true, rest:100,
+      explain:"Gewone pull-up zonder ondersteuning, tweede pull-up moment van de week na dag 1. Ga door tot je geen nette herhaling meer haalt.",
       cue:"Volledig uithangen onderaan, kin boven de stang.",
-      alternates:[{name:"Lat Pulldown", explain:"Zelfde spiergroep maar zittend met een kabel, makkelijker te doseren in gewicht.", cue:"Trek met je ellebogen naar beneden."}] },
+      alternates:[{name:"Assisted Pull-up", repsLabel:"8-10", explain:"Pull-up met een tegengewicht als ondersteuning, voor als je op lichaamsgewicht te weinig herhalingen haalt.", cue:"Volledig uithangen onderaan, kin boven de stang."},{name:"Lat Pulldown", repsLabel:"8-10", explain:"Zelfde spiergroep maar zittend met een kabel, makkelijker te doseren in gewicht.", cue:"Trek met je ellebogen naar beneden."}] },
     { id:"d4e4", name:"Chest-Supported Row", muscle:"Back — Rhomboids & Trapezius, 2e keer", pattern:"pull", sets:3, repsLabel:"10-12", fail:true, rest:100,
       explain:"Liggend met je borst tegen een schuine steun trek je een stang of handvatten naar je lichaam, zonder momentum uit je onderrug.",
       cue:"Ellebogen naar achteren, schouderbladen samenknijpen.",
       alternates:[{name:"Seated Cable Row", explain:"Zelfde spieren maar zittend zonder borstondersteuning.", cue:"Romp stil houden, handvat naar je buik trekken."}] },
-    { id:"d4e5", name:"Face Pulls", muscle:"Shoulders — achterste deltaspier", pattern:"pull", sets:3, repsLabel:"15", fail:false, rest:100,
+    { id:"d4e5", name:"Face Pulls", muscle:"Shoulders — achterste deltaspier", pattern:"pull", sets:3, repsLabel:"15", fail:true, rest:100,
       explain:"Bij een kabelmachine op ooghoogte trek je een touw naar je gezicht, handen bewegen uit elkaar. Traint de achterkant van je schouder.",
       cue:"Ellebogen hoog houden, eindig met je handen naast je oren.",
       alternates:[{name:"Reverse Pec Deck Fly", explain:"Zelfde spier maar in een machine, je duwt de armsteunen naar achteren in plaats van te trekken.", cue:"Lichte buiging in de ellebogen, armen naar achteren openen."}] },
@@ -498,9 +542,143 @@ const DEFAULT_DATA = [
     { id:"d4e7", name:"Push-up", muscle:"Chest — finisher, 2e keer", pattern:"press", sets:3, repsLabel:"max reps", fail:true, rest:100,
       explain:"Gewone push-up op lichaamsgewicht, tweede push-up moment van de week na dag 2. Ga door tot je geen nette herhaling meer haalt.",
       cue:"Lichaam in één lijn van hoofd tot hak, borst tot vlak boven de grond.",
-      alternates:[{name:"Incline Push-up", repsLabel:"max reps", explain:"Handen op een bank of stang, waardoor de oefening lichter wordt. Handig als je borst en schouders al leeg zijn.", cue:"Lichaam in één lijn, borst naar de bank brengen."}] }
+      alternates:[{name:"Incline Push-up", repsLabel:"max reps", explain:"Handen op een bank of stang, waardoor de oefening lichter wordt. Handig als je borst en schouders al leeg zijn.", cue:"Lichaam in één lijn, borst naar de bank brengen."}] },
+    { id:"d4e8", name:"Preacher Curl", muscle:"Biceps brachii — korte kop", pattern:"curl", sets:3, repsLabel:"10-12", fail:true, rest:100,
+      explain:"Met je bovenarmen op een schuine steun curl je een EZ-stang of dumbbells omhoog. De steun voorkomt zwaaien, dus je biceps doet al het werk.",
+      cue:"Bovenarmen blijven op de steun, onderaan bijna volledig strekken.",
+      alternates:[{name:"Dumbbell Curl", explain:"Zelfde beweging staand of zittend met dumbbells.", cue:"Ellebogen vast naast je lichaam, geen zwaai."}] },
+    { id:"d4e9", name:"Single-Arm Cable Pushdown", muscle:"Triceps brachii", pattern:"extension", sets:3, repsLabel:"10-12 p/arm", fail:true, rest:100,
+      explain:"Met één arm tegelijk duw je een enkel kabelhandvat vanaf borsthoogte naar beneden. Zo kun je links en rechts apart tot falen gaan en verschillen wegwerken.",
+      cue:"Elleboog blijft tegen je zij, alleen je onderarm beweegt.",
+      alternates:[{name:"Tricep Dip Machine", repsLabel:"10-12", explain:"Zittend in een machine duw je een handvat naar beneden met beide armen, stabiel en zwaar te doseren.", cue:"Ellebogen naast je lichaam, volledig strekken onderaan."}] }
   ]}
 ];
+
+/* ============ Motiverende quotes (meldingen) ============ */
+const QUOTES = [
+  "Je wekker ging vanochtend en jij stond op. Meer is het eigenlijk niet. Elke grote verandering bestaat uit honderden ochtenden waarop iemand opstond terwijl het bed warmer was dan de sportschool. Vandaag tel jij er weer eentje bij.",
+  "Over een jaar wil je dat je vandaag begonnen was. Niet morgen, niet maandag, vandaag. De versie van jou die over twaalf maanden in de spiegel kijkt, schrijft nu al mee aan dit hoofdstuk. Maak er een om trots op te zijn.",
+  "Winter arc is niet leuk. Het is donker als je vertrekt, koud als je aankomt en pas als je thuis bent voel je wat je hebt gedaan. Precies daarom doen de meeste mensen het niet, en daarom gaat het bij jou werken.",
+  "De drang om te snacken duurt maar een paar minuten. Drink een glas water, loop een rondje, doe iets anders. Elke golf die je laat passeren is een stukje discipline dat je morgen weer kunt uitgeven.",
+  "Weet je nog hoe zwaar het begin was? Hoe lomp die eerste stang voelde? Kijk wat je nu doet. Dat ging niet vanzelf, dat ging door te blijven komen. Je bent al veel verder dan de versie van jou die twijfelde.",
+  "Opgeven voelt als rust, maar het is een lening met rente. Je betaalt het terug in de spiegel, in je energie en in dat zeurende gevoel dat je meer kon. Doe liever nog een set en leen niets.",
+  "Niemand heeft ooit spijt gehad van een training die ze deden. Wel van de trainingen die ze oversloegen. Pak je tas en ga. Het moeilijkste deel is de deur uitlopen, de rest doet je lichaam voor je.",
+  "Je hoeft niet perfect te eten. Je hoeft vandaag alleen een betere keuze te maken dan gisteren, en bij de volgende maaltijd opnieuw. Een slechte maaltijd breekt niets, maar elke goede keuze bouwt iets op. Kies nu.",
+  "Die laatste herhaling waarvan je denkt dat je hem niet haalt: daar gebeurt het. Spieren groeien niet in je comfortzone maar op de plek waar je wilt stoppen en dat niet doet. Nog een.",
+  "Afvallen gaat niet in een rechte lijn. Sommige weken zakt de weegschaal, andere weken lijkt er niets te gebeuren. Ondertussen werkt het onder de oppervlakte gewoon door. Vertrouw het proces en blijf loggen.",
+  "Motivatie is een gast die komt en gaat. Discipline is degene die altijd thuis is. Op de dagen dat je geen zin hebt, bewijs je wie je werkelijk bent, en dat zijn precies de dagen die het verschil maken.",
+  "Niemand ziet de ochtenden waarop je koud en moe in de gym staat. Ze zien alleen het resultaat, maanden later. Dat is de deal van de grind: het werk is onzichtbaar en de beloning is voor iedereen zichtbaar.",
+  "Je hoeft je niet goed te voelen om te beginnen. Begin gewoon met de eerste warming-up set. Na tien minuten vraagt je lichaam zich al af waarom je twijfelde. Zo werkt het bijna altijd.",
+  "Er komt een moment in elke training waarop het pijn doet en je hoofd zegt dat het genoeg is. Dat is het moment waarop de meeste mensen stoppen. Jij weet nu dat het precies daar begint.",
+  "Een pull-up meer dan vorige week. Vijf kilo meer op de stang. Een herhaling die er vorige maand nog niet in zat. Zo ziet vooruitgang eruit: klein, saai en onweerstaanbaar als je het maandenlang opstapelt.",
+  "Vergelijk je niet met de jongens in het tijdschrift. Vergelijk je met jezelf van drie maanden geleden. Die persoon zou je nu niet herkennen, en dat is het enige vergelijk dat telt.",
+  "Honger is geen noodgeval. Het is een signaal dat je lichaam vet aan het verbranden is. Je overleeft prima een avond zonder te snacken en morgenochtend ben je blij dat je het volhield.",
+  "Elke keer dat je zegt dat je het vanavond laat bij een lege koelkast, win je een klein gevecht. Win er genoeg en je wint de hele oorlog. Je wilt dit doel meer dan dat zakje chips.",
+  "Het is koud, het is donker, het regent. Perfect. Niemand anders staat nu op en daarom is dit het moment waarop jij jezelf van de rest onderscheidt. Winter arc wordt in de wintermaanden gewonnen.",
+  "Disciplines worden gebouwd door dingen te doen die je niet wilt doen, op momenten dat je ze niet wilt doen, tot het je gewoonte wordt. Vandaag is een van die momenten. Pak het.",
+  "Denk aan waarom je begon. Niet aan de spiegel van vandaag, maar aan het gevoel dat je wilde hebben: licht, sterk, trots. Elke training en elke goede maaltijd brengt je een stap dichter bij dat gevoel.",
+  "Je lichaam is een afspiegeling van duizend kleine keuzes. Het is nooit een kwestie van een grote beslissing, het is de gewoonte van dagelijks net iets beter kiezen. Maak vandaag weer zo'n keuze.",
+  "Spijt van een training heeft nog niemand gehad. Spijt van het overslaan, dat voel je de hele dag. Ga gewoon, ook al doe je maar de helft van wat je gepland had. De helft is oneindig veel meer dan niets.",
+  "Je bent niet te laat, je bent niet te oud, je hebt het niet verprutst. Je begint nu en dat is het enige startpunt dat bestaat. Over een half jaar bedank je jezelf voor vandaag.",
+  "Wie hard traint maar slecht eet, loopt op zijn plek. Het voedingsdagboek is geen straf maar een kompas. Log wat je eet, kijk eerlijk, en stuur bij. Dat is wat winnaars doen terwijl anderen gokken.",
+  "De zin om te stoppen komt altijd precies als je bijna bij de doorbraak bent. Dat is geen toeval, dat is hoe weerstand werkt. Ga nog een stap verder dan je lichaam wil en je merkt dat je meer kunt.",
+  "Je hebt al zoveel dagen volgehouden. Dat is geen klein ding. Elke vinkje, elke gelogde set, elke maaltijd waar je nee zei tegen extra. Dat is allemaal opgebouwd krediet. Verspil het niet nu.",
+  "Het zware gewicht dat je nu optilt, was ooit onmogelijk. Wat je nu onmogelijk vindt, wordt later je warming-up. Dat is geen motivatiepraatje, dat is gewoon wat er gebeurt als je blijft komen.",
+  "Als je het makkelijk wilt, kies je niet voor dit. Je koos hier bewust voor, om iemand te worden die niet bij het eerste obstakel afhaakt. Dit is dat obstakel. Ga er dwars doorheen.",
+  "Een koekje is een paar minuten genot. Je doel is een leven lang genot. Het lijkt een eerlijke ruil, maar dat is het niet. Laat het liggen en voel hoe goed het is om jezelf te vertrouwen.",
+  "Je kunt niet harder trainen dan je lichaam toelaat, maar je kunt wel elke dag net iets verder gaan dan gisteren. Dat is progressive overload, en het werkt voor spieren en voor karakter.",
+  "Rust is geen zwakte. Slaap, eiwitten en een rustdag zijn onderdeel van de training. De spier groeit niet in de gym maar tijdens het herstel. Neem je rust net zo serieus als je zwaarste set.",
+  "Je hoeft vandaag niet je beste training ooit te doen. Een gemiddelde training is nog steeds een training die de meeste mensen niet doen. Houd het ritme vast, de pieken komen vanzelf.",
+  "Elke keer dat je een training afrondt waar je geen zin in had, bouw je vertrouwen in jezelf op. Dat vertrouwen neem je mee naar je werk, je relaties en je doelen. De gym traint meer dan alleen spieren.",
+  "Vandaag is dag zoveel van je weg. Misschien voel je nog niets, misschien twijfel je. Maar de mensen die ver komen, hebben allemaal weken gehad waarin het niet leek te werken. Blijf stapelen.",
+  "Als je morgen wakker wordt en je spieren doen pijn, dan weet je dat het gewerkt heeft. Die pijn is geen probleem maar bewijs. Het is wat er overblijft van een training waar je alles gaf.",
+  "Je zegt dat je geen tijd hebt. Maar je hebt tijd voor je telefoon, voor series, voor eindeloos scrollen. Een uur training is een keuze, geen luxe. Maak die keuze nu en je voelt het de hele dag.",
+  "Spiegels liegen niet, maar ze zijn ook traag. Je lichaam verandert elke dag, ook als je het niet ziet. Vertrouw op de cijfers in je logboek: het gewicht op de stang liegt nooit.",
+  "De avond is het moeilijkst. Je bent moe, de dag is voorbij, de bank lokt, de kast ook. Maar na acht uur niet meer eten is precies de gewoonte die het verschil maakt. Sluit de keuken en wees trots.",
+  "Je bent niet je slechtste dag. Je bent niet die ene mislukte maaltijd. Je bent de optelsom van wat je blijft doen. Een misstap herstel je met de volgende maaltijd, niet met schuldgevoel.",
+  "Sommige dagen is de beste training die je kunt doen simpelweg komen opdagen. De gewichten zijn lichter, de energie lager, maar je was er. Aanwezigheid is de basis waarop alle progressie rust.",
+  "Het geheim van elke transformatie is saai: dezelfde dingen doen, week na week, ook als het niet spannend is. Wie dat volhoudt, wordt onherkenbaar. Wie op avontuur wil, haakt af. Blijf saai.",
+  "Winter arc betekent dat je nu bouwt terwijl anderen schuilen. Als het voorjaar komt, kijk je terug op de koude ochtenden en de late avonden, en je weet precies waarom je er zo goed uitziet.",
+  "Iedereen heeft dagen waarop hij wil opgeven. Het verschil zit niet in het hebben van die gedachte, maar in wat je ermee doet. Je mag het denken, je hoeft het alleen niet te doen.",
+  "Je lichaam kan veel meer dan je hoofd denkt. Het hoofd geeft op bij zeventig procent, het lichaam heeft nog dertig procent in reserve. Leer de stem negeren en ga door tot echt niets meer lukt.",
+  "Het doel is geen gewicht op de weegschaal, het is een gevoel: in een shirt lopen en je goed voelen, de trap op rennen zonder ademnood, jezelf weer vertrouwen. Dat gevoel wordt hier gebouwd, set voor set.",
+  "Er staat een versie van jou te wachten die sterker, leaner en zelfverzekerder is. Hij zit niet ver weg, hij zit precies achter de volgende maand discipline. Ga hem ophalen.",
+  "Iedere expert was ooit een beginner die niet opgaf. Iedere gespierde man begon met een stang waar hij zich voor schaamde. Het enige verschil tussen hem en de rest is dat hij bleef komen.",
+  "Als je vandaag een goede keuze maakt, is het morgen makkelijker. Discipline is geen spier die je opblaast, het is een snelweg die je aanlegt. Elke keer dat je hem gebruikt, wordt hij breder.",
+  "Een slechte dag in de gym is nog altijd beter dan een goede dag op de bank. Je bouwt geen perfectie, je bouwt een gewoonte. En een gewoonte wint het altijd van een bevlieging.",
+  "Je hebt jezelf beloofd dat je dit zou doen. Aan wie dacht je de belofte te breken? Niet aan een coach of een vriend, maar aan jezelf. Houd je woord, dan leer je jezelf weer vertrouwen.",
+  "De weegschaal is een momentopname, geen oordeel. Water, zout, slaap en stress bewegen het getal elke dag. Kijk naar de trend van weken, niet van een dag, en blijf het plan volgen.",
+  "Als niemand je zou zien, zou je dan nog steeds die laatste herhaling doen? Het antwoord op die vraag zegt alles over wie je wordt. Doe het voor de man die je over een jaar wilt zijn.",
+  "Stel je voor dat je over drie maanden terugkijkt op vandaag. Je ziet iemand die doorzette terwijl het zwaar was. Wees die persoon nu al, dan hoef je er over drie maanden niet meer naar te streven.",
+  "Er is geen hack voor hard werk. Geen supplement, geen schema, geen truc vervangt het gewoon doen. Gelukkig is dat ook de goede nieuws: iedereen kan het, het kost alleen volharding.",
+  "Je lichaam leert van herhaling. Elke training is een bericht aan je lichaam: dit is wie ik wil zijn. Stuur het bericht elke dag en op een dag antwoordt het door er precies zo uit te zien.",
+  "Cravings zijn als golven. Ze komen op, bereiken hun hoogtepunt en zakken weer weg, ook als je niets doet. Surf erop, bijt je erdoorheen, en ze verliezen elke keer een beetje van hun kracht.",
+  "Denk aan wat je hebt opgegeven om hier te komen: de late avonden, de snacks, de makkelijke ochtenden. Dat was geen verlies, dat was een investering. Laat het niet voor niets zijn geweest.",
+  "Een bord ongezonde troost lost niets op. Het voelt twee minuten goed en daarna slechter dan ervoor. Een training doet het omgekeerde: eerst zwaar, daarna een gevoel dat je niets kan breken.",
+  "Wie vandaag traint, krijgt morgen het cadeau. Dat cadeau is niet zichtbaar in de spiegel, maar voelbaar in je energie, je houding en je zelfvertrouwen. Geef jezelf dat cadeau opnieuw.",
+  "Je weet dat je het kunt. Je hebt het eerder gedaan, op dagen dat het moeilijker was dan nu. Gebruik die herinnering als brandstof en doe wat je al eerder bewees: doorgaan.",
+  "Sterk worden is geen straf, het is een geschenk aan je toekomstige zelf. Elke kilo die je nu optilt, maakt het leven later lichter. Dat is de mooiste rente die je ooit zult ontvangen.",
+  "De spiegel van vandaag is niet het eindresultaat. Het is een tussenstop. Je bent niet waar je wilt zijn, maar je bent ook niet meer waar je was. Blijf bewegen in de goede richting.",
+  "Het eten dat je vandaag laat staan, is de energie die je morgen krijgt. Elke gelogde maaltijd, elke bewuste keuze, bouwt het lichaam waar je naar verlangt. Houd het bij en wees eerlijk.",
+  "Tot falen gaan is geen ongeluk, het is de bedoeling. Op het punt waar je denkt dat er niets meer in zit, begint de groei. Ga voorbij het comfortabele en je spieren moeten wel meebewegen.",
+  "Er is niemand die dit voor je kan doen. Geen trainer tilt het gewicht voor je op, geen dokter eet voor je gezond. Dat is zwaar, maar ook het mooiste: de verdienste is helemaal van jou.",
+  "Een dip betekent niet dat het plan faalt. Het betekent dat je mens bent. Pak de draad op bij de volgende maaltijd, de volgende training. Het enige wat een dip erger maakt is een tweede dip uit schaamte.",
+  "Het zijn de ochtenden die het doen. Een goede dag begint vaak met een goede keuze om uit bed te komen. Win de ochtend en je hebt al een voorsprong op een dag waarin anderen nog aan het snoozen zijn.",
+  "Je was ooit iemand die zei dat dit nooit zou lukken. Kijk nu eens naar jezelf. Je traint, je logt, je let op wat je eet. Dat is geen kleine verandering, dat is een nieuw identiteitsverhaal.",
+  "Spieren komen niet van wensen. Ze komen van gewicht, volume, eten en slaap, in die volgorde, week na week. Er is geen snelkoppeling, maar het pad is helder en jij staat er al op.",
+  "Een training is nooit verloren tijd. Zelfs de slechtste training voedt het gevoel dat je iemand bent die dit doet. Identiteit wordt gebouwd door daden, niet door intenties.",
+  "Het kost je nu moeite, maar die moeite is tijdelijk. Het resultaat is permanent. Een uur zweten voor een leven lang trots, dat is een van de beste deals die je ooit kunt sluiten.",
+  "Als je vandaag zou stoppen, zou je je morgen slecht voelen. Als je doorgaat, voel je je morgen sterker. Het antwoord is al bekend. Het enige wat nog moet gebeuren is dat je het doet.",
+  "Het verleden is niet je beperking. Hoe je er vorig jaar uitzag, hoe je at, hoe je dacht: het is voorbij. Elke dag begint met een schone lei. Vul hem met wat je werkelijk wilt zijn.",
+  "Er komt een moment waarop je terugkijkt en denkt: ik had nooit gedacht dat ik zover zou komen. Dat moment ligt achter de weken waarin je doorging terwijl het niet leek te werken. Ga door.",
+  "Zeg niet dat je het probeert, zeg dat je het doet. Woorden bepalen hoe je hersenen werken. Wie het doet, is iemand die traint. Wie het probeert, is iemand die nog twijfelt. Kies voor doen.",
+  "De mensen die vandaag het hardst werken, zijn niet de talentvolsten maar de volhardendsten. Talent is een voorsprong, volharding is de finish. En volharding is iets wat je elke dag kunt kiezen.",
+  "Je lichaam herinnert zich elke training. Elke zware set, elk uur in de gym, elke bewuste maaltijd. Niets gaat verloren. Het stapelt zich op tot een versie van jou die niet meer terug wil.",
+  "Soms is de beste beslissing er een van de minuut: niet nu nadenken over wekenlang volhouden, maar alleen deze set, deze maaltijd, deze beslissing. Dag voor dag, minuut voor minuut, dat is hoe het werkt.",
+  "Wat je vandaag doet, bepaalt hoe je je over een maand voelt. Wil je dan trots zijn of spijt hebben? Het is geen filosofie, het is de simpele optelsom van dagen die je nu nog zelf kunt kleuren.",
+  "Het is geen schande om vermoeid te zijn. Het is een eer als je het gewicht toch optilt. Vermoeidheid is het bewijs dat je werk levert, en werk levert resultaat. Vertrouw het proces.",
+  "Als je wilt weten of je het meent, kijk dan naar wat je doet als niemand kijkt: op de dag dat het regent, de dag dat je vermoeid bent, de dag dat de snack naast je ligt. Daar zie je het karakter.",
+  "Iedere keer dat je kiest voor het zwaardere pad, wordt je wilskracht sterker. Het is een spier als elke andere. Je traint hem niet in comfort, maar in precies dit soort momenten.",
+  "Voor elke keer dat je dacht dat je het niet zou volhouden, ben je er nog. Voor elke twijfel die je overwon, ben je sterker geworden. Je bent resistenter dan je denkt. Vertrouw op wat je al bewees.",
+  "De grind is geen fase, het is een levensstijl. Er komt geen moment waarop alles makkelijk wordt, wel een moment waarop je ervan gaat houden. En dan wil je niets liever dan door blijven gaan.",
+  "Als je moe bent, rust dan, maar geef niet op. Het verschil is subtiel maar essentieel: rusten is een pauze in een verhaal dat doorgaat, opgeven is het einde van het verhaal. Kies de pauze.",
+  "Je hebt een plan, je hebt een schema, je hebt een doel. Het enige wat nog ontbreekt is de uitvoering van vandaag. En die ligt volledig in jouw handen. Ga naar binnen en maak het af.",
+  "Vergeet de snelle oplossingen. Je lichaam is gebouwd voor volharding, niet voor sprints. Het bouwt langzaam maar zeker, en wat langzaam wordt opgebouwd, blijft. Geduld is een kracht, geen gebrek.",
+  "Elke keer dat je een training logt, schrijf je een stukje geschiedenis. Over een jaar kun je terugbladeren en zien hoe ver je kwam. Zorg dat dat boek vol staat met dagen waar je trots op bent.",
+  "Je hebt al bewezen dat je het kunt: je staat hier. Je traint, je telt, je let op. De meeste mensen blijven bij dromen. Jij maakt het echt, een set tegelijk. Dat is iets om trots op te zijn.",
+  "Als je dit leest, is het tijd om te bewegen. Leg je telefoon weg, pak je spullen, ga. Over een uur ben je blij dat je het deed, en over een jaar ben je dankbaar dat je nooit stopte.",
+  "Het zware werk van vandaag is het gemak van morgen. Wat nu een worsteling is, wordt vanzelfsprekend als je blijft komen. Zo groeit alles: eerst met moeite, dan met gewoonte, dan met vanzelfsprekendheid.",
+  "Het enige wat je hoeft te doen is beter zijn dan gisteren. Niet beter dan een ander, niet perfect, alleen een beetje beter. Honderd dagen lang een beetje beter, en je bent een ander mens.",
+  "Je weet hoe het voelt om op te geven: een korte opluchting en dan lang spijt. Je weet ook hoe het voelt om door te zetten: even pijn en dan een groot gevoel van kracht. Kies wat je al kent als beter.",
+  "De koude bank, de warme deken, de koekjes in de kast: ze zijn er morgen ook nog. Je training en je kans op een betere versie van jezelf zijn er alleen vandaag. Kies voor wat niet terugkomt.",
+  "Winter arc is geen tijdelijke stunt, het is een bewijs. Bewijs dat je kunt wat je jezelf beloofde, ook als het donker is en niemand kijkt. Aan het einde van de winter heb je iets wat niemand je afneemt.",
+  "Je zegt dat het zwaar is. Ja, dat klopt. Maar zwaar is precies waarom het iets waard is. Wat makkelijk is, kan iedereen. Jij kiest voor wat zwaar is en daardoor word je iemand die weinig anderen zijn.",
+  "Stop met wachten op het perfecte moment. Er bestaat geen perfect moment, alleen dit moment. Begin met wat je hebt, waar je bent, zoals je je voelt. Het resultaat komt van beginnen, niet van wachten.",
+  "Het gewicht op de stang is niet het echte gewicht. Het echte gewicht is de twijfel in je hoofd, de uitvlucht, de smoes. Til die eerst op en de stang voelt aanzienlijk lichter.",
+  "Je bent niet alleen. Overal staan mensen op dit moment in de kou te trainen, hun maaltijden te loggen en nee te zeggen tegen een snack. Je bent onderdeel van een leger van mensen die niet opgeven. Sluit je aan."
+];
+
+/* ============ Meldingen (ntfy.sh) ============ */
+function defaultNotifs() {
+  return [
+    { id: "n-stop", on: true, title: "Stop met eten", time: "20:00", until: "", kind: "text", text: "Het is 20:00. Niet meer eten vandaag, dat is het plan om af te vallen. Sluit de keuken, drink water of thee en wees trots dat je dit volhoudt." },
+    { id: "n-log-ontbijt", on: true, title: "Log je ontbijt", time: "11:00", until: "", kind: "text", text: "Tijd om je ontbijt te loggen in de Virtuafood app." },
+    { id: "n-log-lunch", on: true, title: "Log je lunch", time: "15:00", until: "", kind: "text", text: "Tijd om je lunch te loggen in de Virtuafood app." },
+    { id: "n-log-avond", on: true, title: "Log je avondeten", time: "20:00", until: "", kind: "text", text: "Tijd om je avondeten te loggen in de Virtuafood app." },
+    { id: "n-quote", on: true, title: "Goedemorgen, tijd om te grinden", time: "07:00", until: "", kind: "quote", text: "" }
+  ];
+}
+function normalizeNotif(n) {
+  return {
+    id: n.id || genId(),
+    on: n.on !== false,
+    title: n.title == null ? "" : String(n.title),
+    time: isHM(n.time) ? n.time : "12:00",
+    until: isHM(n.until) ? n.until : "",
+    kind: n.kind === "quote" ? "quote" : "text",
+    text: n.text == null ? "" : String(n.text)
+  };
+}
 
 /* ============ Storage ============ */
 const STORE_KEY = "trainingsschema_store";
@@ -540,7 +718,7 @@ function normalizeDay(d) {
     ex.repsLabel = ex.repsLabel == null ? "" : String(ex.repsLabel);
     ex.explain = ex.explain == null ? "" : String(ex.explain);
     ex.cue = ex.cue == null ? "" : String(ex.cue);
-    ex.fail = !!ex.fail;
+    ex.fail = true; /* elke set tot falen */
     if (!Array.isArray(ex.alternates)) ex.alternates = [];
     ex.alternates = ex.alternates.filter(a => a && typeof a === "object");
     ex.alternates.forEach((a, i) => {
@@ -555,7 +733,7 @@ function normalizeDay(d) {
   return d;
 }
 function freshStore() {
-  return { version: STORE_VERSION, schemaRev: SCHEMA_REV, schema: clone(DEFAULT_DATA), swaps: {}, session: null, logs: {}, history: [], prefs: {}, timer: null };
+  return { version: STORE_VERSION, schemaRev: SCHEMA_REV, schema: clone(DEFAULT_DATA), swaps: {}, session: null, logs: {}, history: [], prefs: {}, timer: null, notifSent: {} };
 }
 function migrate(s) {
   if (!s || typeof s !== "object") s = freshStore();
@@ -576,7 +754,11 @@ function migrate(s) {
   if (!s.logs || typeof s.logs !== "object") s.logs = {};
   if (!Array.isArray(s.history)) s.history = [];
   s.history.forEach(h => { if (h && !h.id) h.id = genId(); });
-  s.prefs = Object.assign({ autoAdvance: true, sound: true, wakeLock: true }, s.prefs || {});
+  s.prefs = Object.assign({ autoAdvance: true, sound: true, wakeLock: true, notifOn: false, notifStatus: "", lastQuote: -1 }, s.prefs || {});
+  if (!s.prefs.ntfyTopic) s.prefs.ntfyTopic = "training-" + randomId(10);
+  if (!Array.isArray(s.prefs.notifs)) s.prefs.notifs = defaultNotifs();
+  s.prefs.notifs = s.prefs.notifs.filter(n => n && typeof n === "object").map(normalizeNotif);
+  if (!s.notifSent || typeof s.notifSent !== "object") s.notifSent = {};
   if (!s.session || typeof s.session !== "object" || !s.session.date) s.session = { date: todayStr(), days: {}, pos: { d: 0, e: 0 } };
   if (!s.session.days || typeof s.session.days !== "object") s.session.days = {};
   if (!s.session.pos) s.session.pos = { d: 0, e: 0 };
@@ -685,7 +867,7 @@ function suggestFor(ds, vid, n) {
   }
   return { kg: kg, reps: reps };
 }
-function buildEntry(day, ds, date, endedAt) {
+function buildEntry(day, ds, date) {
   if (!ds) return null;
   let setsDone = 0, setsTotal = 0, volume = 0;
   const exercises = [], skipped = [];
@@ -697,18 +879,19 @@ function buildEntry(day, ds, date, endedAt) {
       any = true;
       setsDone += sets.length;
       sets.forEach(s => { volume += parseNum(s.kg) * parseNum(s.reps); });
-      exercises.push({ name: v.name, muscle: ex.muscle, fail: !!ex.fail, target: v.sets + " × " + v.repsLabel, sets: sets.map(s => ({ kg: s.kg, reps: s.reps })) });
+      exercises.push({ name: v.name, muscle: ex.muscle, fail: true, target: v.sets + " × " + v.repsLabel, sets: sets.map(s => ({ kg: s.kg, reps: s.reps })) });
     });
     if (!any) skipped.push(variantFor(ex).name);
   });
   if (!setsDone) return null;
-  return { id: genId(), date: date, dayKey: day.key, dayName: day.name, startedAt: ds.startedAt || null, endedAt: endedAt || null, setsDone: setsDone, setsTotal: setsTotal, volume: Math.round(volume), exercises: exercises, skipped: skipped, note: "" };
+  return { id: genId(), date: date, dayKey: day.key, dayName: day.name, startedAt: ds.startedAt || null, endedAt: ds.lastAt || null, setsDone: setsDone, setsTotal: setsTotal, volume: Math.round(volume), exercises: exercises, skipped: skipped, note: "" };
 }
 function pushHistory(entry) {
   store.history.push(entry);
   if (store.history.length > 600) store.history.splice(0, store.history.length - 600);
 }
-/* Nieuwe dag? Niet-afgeronde workouts van de vorige sessie gaan automatisch naar de geschiedenis. */
+/* Nieuwe werkdag (na 03:00)? Alle workouts van de vorige sessie die nog openstonden
+   (bezig of niet afgerond) gaan automatisch naar de geschiedenis. */
 function ensureToday() {
   const t = todayStr();
   if (store.session && store.session.date === t) return false;
@@ -716,25 +899,15 @@ function ensureToday() {
   if (old && old.days) {
     Object.keys(old.days).forEach(k => {
       const day = store.schema.find(d => d.key === k); if (!day) return;
-      const entry = buildEntry(day, old.days[k], old.date, null);
+      const entry = buildEntry(day, old.days[k], old.date);
       if (entry) pushHistory(entry);
     });
   }
   store.session = { date: t, days: {}, pos: { d: old && old.pos ? old.pos.d || 0 : 0, e: 0 } };
   exIndex = 0;
-  save();
-  return true;
-}
-function finishWorkout(day) {
-  const entry = buildEntry(day, daySession(day), store.session.date, Date.now());
-  if (!entry) return;
-  pushHistory(entry);
-  delete store.session.days[day.key];
-  exIndex = 0;
   stopTimer();
   save();
-  renderAll(); scrollTop();
-  toast("Opgeslagen in geschiedenis");
+  return true;
 }
 function clearToday(day) {
   const ds = daySession(day);
@@ -848,14 +1021,91 @@ $("timerSkip").addEventListener("click", stopTimer);
 $("timerPlus").addEventListener("click", () => adjustTimer(15));
 $("timerMinus").addEventListener("click", () => adjustTimer(-15));
 
+/* Controleer of de werkdag is omgeslagen (03:00) en plan meldingen bij. */
+function dayRollover() {
+  if (ensureToday()) {
+    if (view === "workout") renderAll();
+    else if (view === "history") renderHistory();
+  }
+}
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") {
     tick();
     if (timer) acquireWakeLock();
-    if (ensureToday() && view === "workout") renderAll();
+    dayRollover();
+    planNotifications(false);
   } else { flushSave(); }
 });
 window.addEventListener("pagehide", flushSave);
+setInterval(() => {
+  if (document.visibilityState !== "visible") return;
+  dayRollover();
+  planNotifications(false);
+}, 60000);
+
+/* ============ Pushmeldingen via ntfy.sh ============ */
+const NTFY_URL = "https://ntfy.sh";
+let planning = false;
+
+async function ntfyPublish(title, message, atMs) {
+  const body = { topic: store.prefs.ntfyTopic, title: title, message: message };
+  if (atMs) body.delay = String(Math.floor(atMs / 1000));
+  const r = await fetch(NTFY_URL, { method: "POST", body: JSON.stringify(body) });
+  if (!r.ok) throw new Error("ntfy gaf status " + r.status);
+}
+function pickQuote() {
+  let i = Math.floor(Math.random() * QUOTES.length);
+  if (QUOTES.length > 1 && i === store.prefs.lastQuote) i = (i + 1) % QUOTES.length;
+  store.prefs.lastQuote = i;
+  return QUOTES[i];
+}
+/* Tijdstip (ms) voor een melding op een bepaalde dag. Met "tot" kiest hij een willekeurig moment in dat venster. */
+function notifTime(nt, day, now) {
+  if (!isHM(nt.time)) return null;
+  const at = s => { const a = s.split(":"); return new Date(day.getFullYear(), day.getMonth(), day.getDate(), +a[0], +a[1]).getTime(); };
+  const earliest = now + 20000; /* ntfy: minimaal 10 seconden vooruit */
+  let lo = at(nt.time);
+  if (isHM(nt.until)) {
+    const hi = at(nt.until);
+    lo = Math.max(lo, earliest);
+    if (hi < lo) return null;
+    return Math.round(lo + Math.random() * (hi - lo));
+  }
+  return lo >= earliest ? lo : null;
+}
+/* Plant alle meldingen van de komende ~70 uur in die nog niet zijn ingepland (ntfy staat max. 3 dagen vooruit toe). */
+async function planNotifications(manual) {
+  const p = store.prefs;
+  if (planning || !p.notifOn || !p.ntfyTopic) return 0;
+  planning = true;
+  let added = 0;
+  try {
+    const now = Date.now(), limit = now + 71 * 3600 * 1000;
+    Object.keys(store.notifSent).forEach(k => { if (store.notifSent[k] < now - 86400000) delete store.notifSent[k]; });
+    for (let off = 0; off <= 3; off++) {
+      const day = new Date(); day.setHours(0, 0, 0, 0); day.setDate(day.getDate() + off);
+      for (const nt of p.notifs) {
+        if (!nt.on) continue;
+        const key = nt.id + "|" + dateStr(day) + "|" + nt.time + "|" + (isHM(nt.until) ? nt.until : "");
+        if (store.notifSent[key]) continue;
+        const at = notifTime(nt, day, now);
+        if (!at || at > limit) continue;
+        const msg = nt.kind === "quote" ? pickQuote() : nt.text;
+        await ntfyPublish(nt.title || "Training", msg || " ", at);
+        store.notifSent[key] = at;
+        added++;
+      }
+    }
+    if (added > 0 || manual) p.notifStatus = "Bijgewerkt om " + fmtTime(Date.now()) + ": " + added + " nieuwe melding" + (added === 1 ? "" : "en") + " ingepland.";
+  } catch (e) {
+    p.notifStatus = "Inplannen mislukt om " + fmtTime(Date.now()) + ": " + ((e && e.message) || "geen verbinding");
+  } finally {
+    planning = false;
+    save();
+    if (view === "settings" && settingsTab === "notif") { const s = $("notifStatus"); if (s) s.textContent = p.notifStatus || ""; }
+  }
+  return added;
+}
 
 /* Wat komt er na deze rust? */
 function nextUpText(day, ex, v) {
@@ -874,6 +1124,7 @@ function nextUpText(day, ex, v) {
 /* ============ Workout view ============ */
 function setView(v) {
   flushSave();
+  const was = view;
   view = v;
   $("workoutArea").style.display = v === "workout" ? "block" : "none";
   $("settingsArea").style.display = v === "settings" ? "block" : "none";
@@ -885,6 +1136,7 @@ function setView(v) {
   if (v === "settings") { settingsDayIndex = dayIndex; openExId = null; renderSettings(); }
   else if (v === "history") { histLimit = 25; renderHistory(); }
   else renderAll();
+  if (was === "settings" && v !== "settings") planNotifications(false);
   window.scrollTo(0, 0);
 }
 $("gearBtn").addEventListener("click", () => setView(view === "settings" ? "workout" : "settings"));
@@ -938,6 +1190,7 @@ function toggleSet(day, ex, n) {
     if (!s.kg && sug.kg) s.kg = sug.kg;
     if (!s.reps && sug.reps) s.reps = sug.reps;
     s.done = true;
+    daySession(day).lastAt = Date.now();
     recordLog(v.id, n, s.kg, s.reps);
     const complete = isComplete(day, ex);
     const workoutDone = complete && day.exercises.every(e => isComplete(day, e));
@@ -962,23 +1215,22 @@ function toggleSet(day, ex, n) {
 
 function renderDoneScreen(day, card) {
   const ds = daySession(day);
-  let totalSets = 0, totalPossible = 0, fireCompleted = 0, volume = 0;
+  let totalSets = 0, totalPossible = 0, reps = 0, volume = 0;
   const listHtml = day.exercises.map((ex, i) => {
     const v = variantFor(ex), done = doneCount(day, ex), complete = done >= v.sets;
     totalSets += done; totalPossible += v.sets;
-    if (ex.fail && complete) fireCompleted++;
-    allVariants(ex).forEach(av => doneSetsIn(ds, av.id).forEach(s => { volume += parseNum(s.kg) * parseNum(s.reps); }));
+    allVariants(ex).forEach(av => doneSetsIn(ds, av.id).forEach(s => { volume += parseNum(s.kg) * parseNum(s.reps); reps += parseNum(s.reps); }));
     const setsTxt = doneSetsIn(ds, v.id).map(fmtSet).join(" · ");
     return '<button class="summary-item ' + (complete ? "complete" : "") + '" data-goto="' + i + '">' +
-      '<div><div class="summary-name">' + escapeHtml(v.name) + (ex.fail ? " 🔥" : "") + '</div>' +
+      '<div><div class="summary-name">' + escapeHtml(v.name) + ' 🔥</div>' +
       '<div class="summary-sub">' + escapeHtml(setsTxt || ex.muscle) + '</div></div>' +
       '<div class="summary-right"><span>' + (complete ? "✅" : "⬜") + '</span> <span class="summary-sub">' + done + "/" + v.sets + '</span></div></button>';
   }).join("");
 
   let title, sub, muted = false;
   if (totalSets === 0) { title = "Nog niets gelogd"; sub = "Tik op een oefening om te beginnen."; muted = true; }
-  else if (totalSets < totalPossible) { title = "Overzicht"; sub = totalSets + " van " + totalPossible + " sets gedaan. Tik op een oefening om verder te gaan, of sla op."; }
-  else { title = "Workout compleet"; sub = escapeHtml(day.name) + " · alle sets gedaan."; }
+  else if (totalSets < totalPossible) { title = "Overzicht"; sub = totalSets + " van " + totalPossible + " sets gedaan. Tik op een oefening om verder te gaan. Wat openstaat wordt om 03:00 automatisch opgeslagen in je geschiedenis."; }
+  else { title = "Workout compleet"; sub = escapeHtml(day.name) + " · alle sets gedaan. Wordt om 03:00 automatisch opgeslagen in je geschiedenis."; }
 
   card.innerHTML =
     '<div class="done-screen">' +
@@ -987,18 +1239,14 @@ function renderDoneScreen(day, card) {
     '<div class="stats-grid">' +
       '<div class="stat-box"><div class="stat-val">' + totalSets + "/" + totalPossible + '</div><div class="stat-lbl">sets</div></div>' +
       '<div class="stat-box"><div class="stat-val">' + fmtNum(volume) + '</div><div class="stat-lbl">kg volume</div></div>' +
-      '<div class="stat-box"><div class="stat-val">' + fireCompleted + '🔥</div><div class="stat-lbl">tot falen</div></div>' +
+      '<div class="stat-box"><div class="stat-val">' + fmtNum(reps) + '</div><div class="stat-lbl">reps</div></div>' +
     '</div>' +
     '<div class="summary-list">' + listHtml + '</div>' +
-    '<div class="nav-row">' +
-      '<button class="nav-btn" id="btnPrev">Vorige</button>' +
-      '<button class="nav-btn primary" id="btnFinish"' + (totalSets === 0 ? " disabled" : "") + '>Opslaan &amp; afronden</button>' +
-    '</div>' +
+    '<div class="nav-row"><button class="nav-btn" id="btnPrev">Vorige</button></div>' +
     (totalSets > 0 ? '<button class="link-btn" id="btnClearToday">Sets van vandaag wissen</button>' : "") +
     '</div>';
 
   $("btnPrev").addEventListener("click", () => goToExercise(day.exercises.length - 1, true));
-  $("btnFinish").addEventListener("click", () => finishWorkout(day));
   const clr = $("btnClearToday");
   if (clr) clr.addEventListener("click", () => { if (confirm("Alle afgevinkte sets van vandaag voor deze dag wissen?")) clearToday(day); });
   card.querySelectorAll("[data-goto]").forEach(b => b.addEventListener("click", () => goToExercise(parseInt(b.dataset.goto), true)));
@@ -1024,9 +1272,8 @@ function renderCard() {
   for (let s = 1; s <= v.sets; s++) {
     const d = setData(day, v.id, s, false) || { kg: "", reps: "", done: false };
     const sug = suggestFor(ds, v.id, s);
-    const isFailSet = ex.fail && s === v.sets;
     setsHtml += '<div class="set-row ' + (d.done ? "done" : "") + '">' +
-      '<span class="set-num">Set ' + s + (isFailSet ? " 🔥" : "") + '</span>' +
+      '<span class="set-num">Set ' + s + ' 🔥</span>' +
       '<input class="set-input" type="text" inputmode="decimal" autocomplete="off" enterkeyhint="next" data-set="' + s + '" data-k="kg" value="' + escapeHtml(d.kg) + '" placeholder="' + escapeHtml(sug.kg || "–") + '" aria-label="Gewicht in kg, set ' + s + '">' +
       '<span class="set-x">×</span>' +
       '<input class="set-input" type="text" inputmode="numeric" autocomplete="off" enterkeyhint="done" data-set="' + s + '" data-k="reps" value="' + escapeHtml(d.reps) + '" placeholder="' + escapeHtml(sug.reps || "–") + '" aria-label="Herhalingen, set ' + s + '">' +
@@ -1049,7 +1296,7 @@ function renderCard() {
     '<div class="card-top"><div class="card-top-left">' +
       '<div class="icon-badge">' + iconSvg(ex.pattern) + '</div>' +
       '<span class="muscle-tag">' + escapeHtml(ex.muscle) + '</span></div>' +
-      (ex.fail ? '<span class="fail-badge">🔥 tot falen</span>' : "") + '</div>' +
+      '<span class="fail-badge">🔥 alles tot falen</span></div>' +
     '<h2 class="ex-name">' + escapeHtml(v.name) + '</h2>' +
     '<p class="ex-count">' + (exIndex + 1) + " / " + day.exercises.length + " · " + escapeHtml(day.name) + (v.isAlt ? ' · <span class="alt-note">alternatief</span>' : "") + '</p>' +
     (hasAlts ? '<button class="swap-btn" id="btnSwap">🔁 Wissel oefening</button>' : "") +
@@ -1058,7 +1305,8 @@ function renderCard() {
       '<div class="sr-box"><div class="sr-label">Reps</div><div class="sr-value">' + escapeHtml(v.repsLabel) + '</div></div>' +
       '<div class="sr-box"><div class="sr-label">Rust</div><div class="sr-value">' + (ex.rest > 0 ? fmtClock(ex.rest) : "–") + '</div></div>' +
     '</div>' + lastHtml +
-    '<p class="section-label">Sets</p>' + setsHtml +
+    '<p class="section-label">Sets</p>' +
+    '<p class="fail-note">🔥 Elke set tot spierfalen. De reps zijn een richtlijn: ga door tot je geen nette herhaling meer haalt.</p>' + setsHtml +
     (v.explain || v.cue ? '<p class="section-label">Uitvoering</p>' : "") +
     (v.explain ? '<p class="explain">' + escapeHtml(v.explain) + '</p>' : "") +
     (v.cue ? '<p class="cue">' + escapeHtml(v.cue) + '</p>' : "") +
@@ -1133,7 +1381,6 @@ function histBodyHtml(h) {
     '<div class="mini-box"><div class="mini-val">' + fmtNum(reps) + '</div><div class="mini-lbl">reps</div></div></div>';
 
   if (h.startedAt && h.endedAt) html += '<p class="hist-line">' + fmtTime(h.startedAt) + " – " + fmtTime(h.endedAt) + '</p>';
-  else html += '<p class="hist-line">Niet afgerond, automatisch opgeslagen.</p>';
 
   if (prevDay) {
     const dv = (h.volume || 0) - (prevDay.volume || 0);
@@ -1169,7 +1416,7 @@ function histBodyHtml(h) {
     const sub1 = [e.muscle, e.target ? "doel " + e.target : ""].filter(Boolean).join(" · ");
     const sub2 = [vol > 0 ? "Volume " + fmtNum(vol) + " kg" : "", top ? "topset " + fmtSet(top) : "",
       prevEx ? "vorige keer (" + fmtDate(prevEx.date) + "): " + prevEx.ex.sets.map(fmtSet).join(" · ") : ""].filter(Boolean).join(" · ");
-    html += '<div class="hist-ex"><div class="hist-ex-head"><strong>' + escapeHtml(e.name) + (e.fail ? " 🔥" : "") + '</strong>' + tags + '</div>' +
+    html += '<div class="hist-ex"><div class="hist-ex-head"><strong>' + escapeHtml(e.name) + '</strong>' + tags + '</div>' +
       (sub1 ? '<div class="hist-ex-sub">' + escapeHtml(sub1) + '</div>' : "") +
       '<div class="set-chips">' + (e.sets || []).map((s, i) => '<span class="set-chip"><i>' + (i + 1) + '</i>' + escapeHtml(fmtSet(s)) + '</span>').join("") + '</div>' +
       (sub2 ? '<div class="hist-ex-sub">' + escapeHtml(sub2) + '</div>' : "") + '</div>';
@@ -1210,7 +1457,7 @@ function renderHistory() {
       '<div class="stat-box"><div class="stat-val">' + weekStreak() + '</div><div class="stat-lbl">weken op rij</div></div>' +
       '<div class="stat-box"><div class="stat-val">' + store.history.length + '</div><div class="stat-lbl">totaal</div></div>' +
     '</div>' + chips +
-    (shown.length ? listHtml : '<p class="empty-note">Nog geen workouts opgeslagen.<br>Rond een workout af via het overzicht aan het eind van de balk.</p>') +
+    (shown.length ? listHtml : '<p class="empty-note">Nog geen workouts opgeslagen.<br>Een workout komt hier automatisch om 03:00 \'s nachts.</p>') +
     (filtered.length > shown.length ? '<button class="add-btn" id="btnMoreHist">Toon meer (' + (filtered.length - shown.length) + ')</button>' : "");
 
   $("btnHistBack").addEventListener("click", () => setView("workout"));
@@ -1282,7 +1529,7 @@ function findEx(exId) {
 }
 function exMeta(ex) {
   const n = (ex.alternates || []).length;
-  return ex.sets + " × " + ex.repsLabel + " · " + (ex.rest > 0 ? fmtClock(ex.rest) + " rust" : "geen rust") + (ex.fail ? " · 🔥" : "") + (n ? " · " + n + " alt." : "");
+  return ex.sets + " × " + ex.repsLabel + " · " + (ex.rest > 0 ? fmtClock(ex.rest) + " rust" : "geen rust") + " · 🔥" + (n ? " · " + n + " alt." : "");
 }
 function scrollToRow(id) {
   const c = Array.from(document.querySelectorAll(".ex-row")).find(x => x.dataset.exid === id);
@@ -1297,10 +1544,10 @@ function exFormHtml(ex) {
     '<input class="settings-input" data-field="name" data-exid="' + id + '" value="' + escapeHtml(ex.name) + '">' +
     '<div class="grid-3">' +
       '<div><label class="field-label">Sets</label><input class="settings-input" type="number" inputmode="numeric" min="1" data-field="sets" data-exid="' + id + '" value="' + ex.sets + '"></div>' +
-      '<div><label class="field-label">Reps</label><input class="settings-input" data-field="repsLabel" data-exid="' + id + '" value="' + escapeHtml(ex.repsLabel) + '"></div>' +
+      '<div><label class="field-label">Reps (richtlijn)</label><input class="settings-input" data-field="repsLabel" data-exid="' + id + '" value="' + escapeHtml(ex.repsLabel) + '"></div>' +
       '<div><label class="field-label">Rust (s)</label><input class="settings-input" type="number" inputmode="numeric" min="0" step="5" data-field="rest" data-exid="' + id + '" value="' + ex.rest + '"></div>' +
     '</div>' +
-    '<label class="settings-checkbox" style="margin-top:14px"><input type="checkbox" data-field="fail" data-exid="' + id + '"' + (ex.fail ? " checked" : "") + '> <span>Laatste set tot spierfalen 🔥</span></label>' +
+    '<p class="hint">Elke set is tot spierfalen, de reps zijn een richtlijn.</p>' +
 
     '<details class="sub" data-sub="more"' + (openMore ? " open" : "") + '><summary>Spiergroep, icoon en uitleg</summary><div class="sub-body">' +
       '<div class="grid-2"><div><label class="field-label">Spiergroep</label><input class="settings-input" data-field="muscle" data-exid="' + id + '" value="' + escapeHtml(ex.muscle) + '"></div>' +
@@ -1361,6 +1608,39 @@ function schemaTabHtml(day) {
     '<button class="add-ex-btn" id="btnAddEx">+ Oefening toevoegen</button>';
 }
 
+function notifTabHtml() {
+  const p = store.prefs;
+  const cards = p.notifs.map(nt =>
+    '<div class="alt-card notif-card" data-nid="' + escapeHtml(nt.id) + '">' +
+      '<label class="settings-checkbox" style="margin-top:0"><input type="checkbox" data-nf="on"' + (nt.on ? " checked" : "") + '><span>Aan</span></label>' +
+      '<input class="settings-input" data-nf="title" placeholder="Titel van de melding" aria-label="Titel" value="' + escapeHtml(nt.title) + '">' +
+      '<div class="grid-2">' +
+        '<div><label class="field-label">Tijd</label><input class="settings-input" type="time" data-nf="time" value="' + escapeHtml(nt.time) + '"></div>' +
+        '<div><label class="field-label">Willekeurig tot (optioneel)</label><input class="settings-input" type="time" data-nf="until" value="' + escapeHtml(nt.until) + '"></div>' +
+      '</div>' +
+      '<label class="field-label">Inhoud</label>' +
+      '<select class="settings-select" data-nf="kind"><option value="text"' + (nt.kind === "text" ? " selected" : "") + '>Vaste tekst</option><option value="quote"' + (nt.kind === "quote" ? " selected" : "") + '>Willekeurige motiverende quote (' + QUOTES.length + ')</option></select>' +
+      (nt.kind === "text"
+        ? '<textarea class="settings-textarea" data-nf="text" placeholder="Tekst van de melding" aria-label="Tekst">' + escapeHtml(nt.text) + '</textarea>'
+        : '<p class="hint">Bij elke melding wordt een andere quote uit de lijst gekozen.</p>') +
+      '<button class="link-btn danger" style="margin-top:4px" data-action="delete-notif">Melding verwijderen</button>' +
+    '</div>').join("");
+
+  return '<div class="panel">' +
+      '<label class="settings-checkbox"><input type="checkbox" data-pref="notifOn"' + (p.notifOn ? " checked" : "") + '><span>Meldingen aan<small>Via de gratis ntfy-app, ook als deze app dicht is.</small></span></label>' +
+      '<label class="field-label" style="margin-top:14px">Jouw ntfy-topic</label>' +
+      '<input class="settings-input" id="ntfyTopic" autocapitalize="off" autocorrect="off" spellcheck="false" value="' + escapeHtml(p.ntfyTopic) + '">' +
+      '<p class="hint"><strong>Instellen:</strong> installeer de app <em>ntfy</em> uit de App Store, tik op +, kies als server <em>ntfy.sh</em>, abonneer op bovenstaand topic en sta meldingen toe. Het topic werkt als wachtwoord: deel het met niemand. Druk daarna op Testmelding.</p>' +
+      '<div class="btn-row" style="margin-top:12px"><button class="back-btn" id="btnNtfyTest">Testmelding</button><button class="back-btn" id="btnNtfyPlan">Nu inplannen</button></div>' +
+      '<p class="status-line" id="notifStatus">' + escapeHtml(p.notifStatus || "") + '</p>' +
+      '<p class="hint">Meldingen worden maximaal 3 dagen vooruit ingepland, telkens als je de app opent. Open de app dus minstens om de paar dagen. Wijzig je een tijd of verwijder je een melding, dan blijven al ingeplande meldingen nog maximaal 3 dagen staan.</p>' +
+    '</div>' +
+    '<div class="list-label">Meldingen (' + p.notifs.length + ') <span>elke dag</span></div>' +
+    cards +
+    '<button class="add-ex-btn" id="btnAddNotif">+ Melding toevoegen</button>' +
+    '<button class="add-btn danger" id="btnResetNotifs">Standaardmeldingen herstellen</button>';
+}
+
 function prefsTabHtml() {
   const p = store.prefs;
   return '<div class="panel">' +
@@ -1375,10 +1655,19 @@ function backupTabHtml() {
       '<button class="back-btn" id="btnExport">Exporteren</button>' +
       '<button class="back-btn" id="btnImport">Terugzetten</button></div>' +
       '<input type="file" id="importFile" accept=".json,application/json" style="display:none">' +
-      '<p class="hint">Bevat je schema, logs en geschiedenis. Alles staat alleen op dit apparaat: verwijder je de app van je beginscherm, dan zijn de gegevens weg. Bewaar af en toe een backup in Bestanden of iCloud.</p></div>' +
+      '<p class="hint">Bevat je schema, logs, geschiedenis en meldingen. Alles staat alleen op dit apparaat: verwijder je de app van je beginscherm, dan zijn de gegevens weg. Bewaar af en toe een backup in Bestanden of iCloud.</p></div>' +
     '<div class="panel"><p class="panel-title">Standaard schema</p>' +
       '<button class="reset-btn" id="btnResetAll" style="width:100%">Standaard schema herstellen</button>' +
       '<p class="hint">Zet alle dagen en oefeningen terug naar het origineel. Je logs en geschiedenis blijven staan.</p></div>';
+}
+
+function bindPrefs(el) {
+  el.querySelectorAll("[data-pref]").forEach(cb => cb.addEventListener("change", () => {
+    store.prefs[cb.dataset.pref] = cb.checked;
+    if (cb.dataset.pref === "wakeLock" && !cb.checked) releaseWakeLock();
+    save();
+    if (cb.dataset.pref === "notifOn" && cb.checked) planNotifications(true).then(() => { const s = $("notifStatus"); if (s) s.textContent = store.prefs.notifStatus || ""; });
+  }));
 }
 
 function renderSettings() {
@@ -1389,20 +1678,60 @@ function renderSettings() {
   el.innerHTML =
     '<div class="page-head"><h2 class="page-title">Instellingen</h2><button class="back-btn" id="btnBackToWorkout">Sluiten</button></div>' +
     '<div class="seg" role="tablist">' +
-      [["schema", "Schema"], ["prefs", "Voorkeuren"], ["backup", "Backup"]].map(t =>
+      [["schema", "Schema"], ["notif", "Meldingen"], ["prefs", "Voorkeuren"], ["backup", "Backup"]].map(t =>
         '<button role="tab" aria-selected="' + (settingsTab === t[0]) + '" class="' + (settingsTab === t[0] ? "active" : "") + '" data-stab="' + t[0] + '">' + t[1] + '</button>').join("") +
     '</div>' +
-    (settingsTab === "schema" ? schemaTabHtml(day) : settingsTab === "prefs" ? prefsTabHtml() : backupTabHtml());
+    (settingsTab === "schema" ? schemaTabHtml(day) : settingsTab === "notif" ? notifTabHtml() : settingsTab === "prefs" ? prefsTabHtml() : backupTabHtml());
 
   $("btnBackToWorkout").addEventListener("click", () => setView("workout"));
   el.querySelectorAll("[data-stab]").forEach(b => b.addEventListener("click", () => { flushSave(); settingsTab = b.dataset.stab; renderSettings(); }));
 
-  if (settingsTab === "prefs") {
-    el.querySelectorAll("[data-pref]").forEach(cb => cb.addEventListener("change", () => {
-      store.prefs[cb.dataset.pref] = cb.checked;
-      if (cb.dataset.pref === "wakeLock" && !cb.checked) releaseWakeLock();
-      save();
-    }));
+  if (settingsTab === "prefs") { bindPrefs(el); return; }
+
+  if (settingsTab === "notif") {
+    bindPrefs(el);
+    $("ntfyTopic").addEventListener("input", e => {
+      const clean = e.target.value.replace(/[^A-Za-z0-9_-]/g, "");
+      if (clean !== e.target.value) e.target.value = clean;
+      store.prefs.ntfyTopic = clean; saveSoon();
+    });
+    $("btnNtfyTest").addEventListener("click", async () => {
+      if (!store.prefs.ntfyTopic) { toast("Vul eerst een topic in"); return; }
+      try { await ntfyPublish("Testmelding 💪", "Het werkt. Je trainingsmeldingen komen hier binnen.", 0); toast("Testmelding verstuurd"); }
+      catch (e) { toast("Versturen mislukt: " + ((e && e.message) || "geen verbinding")); }
+    });
+    $("btnNtfyPlan").addEventListener("click", async () => {
+      if (!store.prefs.notifOn) { toast("Zet eerst 'Meldingen aan' aan"); return; }
+      flushSave();
+      await planNotifications(true);
+      const s = $("notifStatus"); if (s) s.textContent = store.prefs.notifStatus || "";
+    });
+    el.querySelectorAll(".notif-card").forEach(card => {
+      const nt = store.prefs.notifs.find(n => n.id === card.dataset.nid); if (!nt) return;
+      card.querySelectorAll("[data-nf]").forEach(inp => {
+        const f = inp.dataset.nf;
+        const evt = (inp.type === "checkbox" || inp.tagName === "SELECT" || inp.type === "time") ? "change" : "input";
+        inp.addEventListener(evt, () => {
+          nt[f] = inp.type === "checkbox" ? inp.checked : inp.value;
+          if (f === "kind") { save(); renderSettings(); } else saveSoon();
+        });
+      });
+      card.querySelector('[data-action="delete-notif"]').addEventListener("click", () => {
+        if (!confirm("Deze melding verwijderen?")) return;
+        store.prefs.notifs = store.prefs.notifs.filter(n => n.id !== nt.id);
+        save(); renderSettings();
+      });
+    });
+    $("btnAddNotif").addEventListener("click", () => {
+      store.prefs.notifs.push(normalizeNotif({ id: genId(), on: true, title: "Nieuwe melding", time: "12:00", until: "", kind: "text", text: "" }));
+      save(); renderSettings();
+    });
+    $("btnResetNotifs").addEventListener("click", () => {
+      if (!confirm("Standaardmeldingen herstellen? Je eigen meldingen worden vervangen.")) return;
+      store.prefs.notifs = defaultNotifs().map(normalizeNotif);
+      save(); renderSettings();
+      toast("Standaardmeldingen hersteld");
+    });
     return;
   }
 
@@ -1476,7 +1805,7 @@ function renderSettings() {
 
   $("btnAddEx").addEventListener("click", () => {
     const id = genId();
-    day.exercises.push({ id: id, name: "Nieuwe oefening", muscle: "", pattern: "press", sets: 3, repsLabel: "10-12", fail: false, rest: 100, explain: "", cue: "", alternates: [] });
+    day.exercises.push({ id: id, name: "Nieuwe oefening", muscle: "", pattern: "press", sets: 3, repsLabel: "10-12", fail: true, rest: 100, explain: "", cue: "", alternates: [] });
     openExId = id; openMore = false; openAlts = false;
     save(); renderSettings(); scrollToRow(id);
   });
@@ -1491,8 +1820,7 @@ function renderSettings() {
     input.addEventListener(evt, () => {
       const ex = findEx(input.dataset.exid); if (!ex) return;
       const field = input.dataset.field;
-      if (field === "fail") ex.fail = input.checked;
-      else if (field === "sets") { ex.sets = Math.max(1, parseInt(input.value) || 1); input.value = ex.sets; }
+      if (field === "sets") { ex.sets = Math.max(1, parseInt(input.value) || 1); input.value = ex.sets; }
       else if (field === "rest") { ex.rest = Math.max(0, parseInt(input.value) || 0); input.value = ex.rest; }
       else ex[field] = input.value;
       const row = input.closest(".ex-row");
@@ -1565,6 +1893,7 @@ ensureToday();
 renderAll();
 if (store.timer && store.timer.endAt > Date.now()) { timer = store.timer; showTimer(); }
 else if (store.timer) { store.timer = null; saveSoon(); }
+planNotifications(false);
 </script>
 </body>
 </html>
